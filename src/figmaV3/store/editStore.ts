@@ -31,12 +31,16 @@ export interface EditorStore {
 // ─────────────────────────────────────────────────────────────
 // 내부 상태
 // ─────────────────────────────────────────────────────────────
+
+// ✅ SSR 안정화를 위해 루트 ID는 고정 값 사용 (서버/클라 동일)
+const rootId = "root";
+
 const listeners = new Set<() => void>();
-const rootId = nanoid(10);
 
 const initialState: EditorState = {
     project: {
         rootId,
+        // ↑ 위에서 고정한 rootId를 그대로 사용
         nodes: {
             [rootId]: {
                 id: rootId,
@@ -49,7 +53,7 @@ const initialState: EditorState = {
     },
     ui: { selectedId: rootId },
     data: {},
-    settings: { canvasWidth: 640, enableActions: true,  dockRight: false }
+    settings: { canvasWidth: 640, enableActions: true, dockRight: false }
 };
 
 let state: EditorState = initialState;
