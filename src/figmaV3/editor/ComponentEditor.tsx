@@ -1,28 +1,44 @@
 "use client";
-import Canvas from "./centerPanel/Canvas";
-import Palette from "./left/Palette";
-import Layers from "./left/Layers";
-import DataPanel from "./rightPanel/DataPanel";
-import {JSX} from "react";
 
+import React, { JSX } from "react";
+
+// 컴포넌트 자동 등록(앱 1회 실행)
+import "@/figmaV3/editor/bootstrap";
+
+import Canvas from "@/figmaV3/editor/centerPanel/Canvas";
+import LeftPanelTabs from "@/figmaV3/editor/leftPanel/LeftPanelTabs";
+import RightPanelTabs from "@/figmaV3/editor/rightPanel/RightPanelTabs";
+
+/** 에디터 레이아웃:
+ *  좌: LeftPanelTabs(Palette/Layers)
+ *  중: Canvas
+ *  우: RightPanelTabs(Inspector/Actions/Data)
+ */
 export default function ComponentEditor(): JSX.Element {
-    return (
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr 320px", height: "100vh" }}>
-            <div style={{ borderRight: "1px solid #e5e7eb", minHeight: 0, overflow: "auto" }}>
-                <div style={{ padding: 10, fontWeight: 600 }}>Palette</div>
-                <Palette />
-                <div style={{ padding: 10, fontWeight: 600, marginTop: 8 }}>Layers</div>
-                <Layers />
-            </div>
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "280px 1fr 360px",
+        gridTemplateRows: "1fr",
+        height: "100%",
+        minHeight: 0,
+      }}
+    >
+      {/* Left */}
+      <div style={{ borderRight: "1px solid #e5e7eb", minHeight: 0 }}>
+        <LeftPanelTabs />
+      </div>
 
-            <div style={{ minHeight: 0 }}>
-                <Canvas />
-            </div>
+      {/* Center */}
+      <div style={{ minWidth: 0, minHeight: 0 }}>
+        <Canvas />
+      </div>
 
-            <div style={{ borderLeft: "1px solid #e5e7eb", minHeight: 0, overflow: "auto" }}>
-                <div style={{ padding: 10, fontWeight: 600 }}>Data</div>
-                <DataPanel />
-            </div>
-        </div>
-    );
+      {/* Right */}
+      <div style={{ borderLeft: "1px solid #e5e7eb", minHeight: 0 }}>
+        <RightPanelTabs />
+      </div>
+    </div>
+  );
 }

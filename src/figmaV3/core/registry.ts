@@ -1,26 +1,23 @@
-import type { ComponentDefinition, StyleBase } from "./types";
+import type { ComponentDefinitionBase } from "./types";
 
-class Registry {
-    private map = new Map<string, ComponentDefinition<Record<string, unknown>, StyleBase>>();
+/**
+ * 컴포넌트 레지스트리(런타임 전역)
+ * - 등록/조회/목록
+ */
+const REGISTRY = new Map<string, ComponentDefinitionBase>();
 
-    register<P extends Record<string, unknown>, S extends StyleBase>(
-        def: ComponentDefinition<P, S>
-    ): void {
-        this.map.set(def.id, def as unknown as ComponentDefinition<Record<string, unknown>, StyleBase>);
-    }
-
-    get(id: string) {
-        return this.map.get(id);
-    }
-
-    list() {
-        return Array.from(this.map.values());
-    }
+export function registerComponent(def: ComponentDefinitionBase): void {
+  REGISTRY.set(def.id, def);
 }
 
-let _reg: Registry | null = null;
-export function getRegistry() {
-    if (!_reg) _reg = new Registry();
-    return _reg;
+export function getComponent(id: string): ComponentDefinitionBase | undefined {
+  return REGISTRY.get(id);
 }
-export type { Registry };
+
+export function listAllComponents(): ComponentDefinitionBase[] {
+  return Array.from(REGISTRY.values());
+}
+
+export function clearRegistry(): void {
+  REGISTRY.clear();
+}
