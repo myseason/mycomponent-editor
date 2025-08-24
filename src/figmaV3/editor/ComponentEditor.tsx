@@ -1,5 +1,7 @@
 "use client";
 
+import "@/figmaV3/editor/bootstrap";
+
 import React from "react";
 import styles from "@/figmaV3/editor/css/editorLayout.module.css";
 import LeftPanelTabs from "@/figmaV3/editor/leftPanel/LeftPanelTabs";

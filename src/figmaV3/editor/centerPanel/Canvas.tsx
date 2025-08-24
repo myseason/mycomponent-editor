@@ -27,7 +27,7 @@ export default function Canvas() {
     }
 
     return (
-        // 중앙 패널(.center)은 이미 100vh 그리드의 1fr을 차지. 여기선 스테이지만 그리면 됨.
+        // 중앙 패널(.center)은 100vh 그리드의 1fr을 차지. 여기서는 스테이지만 그리면 됨.
         <div
             style={{
                 flex: 1,
@@ -38,14 +38,16 @@ export default function Canvas() {
             }}
             onClick={() => store.select(state.project.rootId)}
         >
-            {/* 스테이지(흰색 캔버스 보드): 너비는 설정 값, 높이는 중앙 패널의 높이를 가득 쓰도록 */}
+            {/* 스테이지(흰색 보드): 보드 자체와 루트가 함께 40px 내려오도록 marginTop만 적용 */}
             <div
                 style={{
                     width: state.settings!.canvasWidth,
-                    minHeight: "100%",            // ← 중앙 패널 높이를 그대로 채움
+                    minHeight: "100%",
                     background: "white",
                     border: "1px solid #e5e7eb",
                     boxShadow: "0 0 0 1px rgba(0,0,0,0.02) inset",
+                    marginTop: 40,               // ← ★ 보드+루트 함께 40px 하강
+                    boxSizing: "border-box",
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -134,7 +136,7 @@ export default function Canvas() {
                 onClick={handleSelect}
                 style={{
                     position: "relative",
-                    // ✅ 루트 박스가 비어있어도 보이도록 최소 높이 부여
+                    // 루트 박스가 비어있어도 보이도록 최소 높이
                     minHeight: isRoot ? 200 : undefined,
                 }}
             >
