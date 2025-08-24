@@ -1,119 +1,166 @@
 "use client";
 
-/* ------------------------------------------------------------
-   Canvas.tsx (V3)
-   - 훅 규칙 준수: 훅 호출 후 마지막에만 return 분기
-   - 데이터 바인딩: def.Render 직전 node.props 바인딩 적용
-   - 액션: fire 콜백으로 컴포넌트 내부에서 runActions 트리거
------------------------------------------------------------- */
-
-import React, {JSX, useCallback, useMemo} from "react";
-
+import React from "react";
+import type {
+    NodeAny,
+    ComponentDefinition,
+    StyleBase,
+    BindingScope,
+} from "@/figmaV3/core/types";
 import { getComponent } from "@/figmaV3/core/registry";
-import type { EditorState, NodeAny } from "@/figmaV3/core/types";
 import { useEditor } from "@/figmaV3/editor/useEditor";
-import { runActions, type SupportedEvent } from "@/figmaV3/runtime/actions";
-import { getBoundProps, type BindingScope } from "@/figmaV3/runtime/binding";
+import { getBoundProps } from "@/figmaV3/runtime/binding";
 
-/** 캔버스 폭 선택(설정 없으면 640) */
-function selectCanvasWidth(state: EditorState): number {
-  const w = state.settings?.canvasWidth;
-  return typeof w === "number" && Number.isFinite(w) ? w : 640;
-}
+/**
+ * 중앙 캔버스
+ * - 루트 노드부터 재귀 렌더
+ * - 선택 처리
+ * - 데이터 바인딩(템플릿) 적용
+ * - absolute/fixed는 cloneElement로 직접 outline/클릭 부여
+ * - 그 외는 래퍼+오버레이 방법으로 선택 표시
+ */
+export default function Canvas() {
+    const { state, store } = useEditor();
+    const root = state.project.nodes[state.project.rootId] as NodeAny | undefined;
 
-type NodesMap = Record<string, NodeAny>;
+    if (!root) {
+        // 루트가 없으면 빈 캔버스만
+        return <div style={{ flex: 1, background: "#f3f4f6" }} />;
+    }
 
-/** 단일 노드 렌더러 (훅은 항상 호출, return은 마지막에 한 번만) */
-function NodeView(props: {
-  id: string;
-  nodesMap: NodesMap;
-  state: EditorState;
-}): JSX.Element | null {
-  const { id, nodesMap, state } = props;
-
-  // 입력값 준비(훅 앞에서만 "값 계산"은 자유지만, return은 금지)
-  const node: NodeAny | null = nodesMap[id] ?? null;
-  const def = node ? getComponent(node.componentId) : null;
-
-  // 데이터 바인딩 스코프(항상 훅 호출)
-  const scope: BindingScope = useMemo(
-    () => ({
-      data: state.data ?? {},
-      props: (node?.props ?? {}) as Record<string, unknown>,
-      settings: state.settings ?? {},
-    }),
-    [state.data, state.settings, node?.props]
-  );
-
-  // 바운딩된 props(항상 훅 호출)
-  const boundProps = useMemo(
-    () => getBoundProps((node?.props ?? {}) as Record<string, unknown>, scope),
-    [node?.props, scope]
-  );
-
-  // 렌더용 노드(항상 훅 호출)
-  const nodeForRender: NodeAny | null = useMemo(
-    () => (node ? { ...node, props: boundProps } : null),
-    [node, boundProps]
-  );
-
-  // 액션 실행기(항상 훅 호출)
-  const fire = useCallback(
-    (evt: SupportedEvent) => {
-      if (state.settings?.enableActions === false) return;
-      // 원본 노드 기준으로 액션 스캔(스펙 저장 위치: node.props.__actions)
-      if (node) runActions(node, evt);
-    },
-    [node, state.settings?.enableActions]
-  );
-
-  // 🔚 최종 분기(훅 뒤에서 한 번만)
-  if (!node || !def || typeof def.Render !== "function" || !nodeForRender) {
-    return null;
-  }
-
-  return def.Render({ node: nodeForRender, fire });
-}
-
-/** 캔버스 컨테이너 */
-export default function Canvas(): JSX.Element {
-  const { state } = useEditor();
-  const rootId = state.project.rootId;
-  const nodesMap = state.project.nodes as NodesMap;
-
-  const canvasWidth = selectCanvasWidth(state);
-
-  // 루트가 없을 때는 안내 (useEditor 훅은 항상 호출되므로 훅 규칙 위반 아님)
-  if (!rootId || !nodesMap[rootId]) {
     return (
-      <div style={{ display: "grid", placeItems: "center", height: "100%", color: "#9ca3af" }}>
-        루트 컨테이너가 없습니다.
-      </div>
+        <div
+            style={{
+                flex: 1,
+                background: "#f3f4f6",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                overflow: "auto",
+            }}
+            onClick={() => store.select(state.project.rootId)} // 빈 영역 클릭 시 루트 선택
+        >
+            <div
+                style={{
+                    width: state.settings!.canvasWidth,
+                    minHeight: 480,
+                    background: "white",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 0 0 1px rgba(0,0,0,0.02) inset",
+                }}
+                onClick={(e) => {
+                    // 캔버스 박스 자체 클릭 시 루트 선택
+                    e.stopPropagation();
+                    store.select(state.project.rootId);
+                }}
+            >
+                <NodeView node={root} />
+            </div>
+        </div>
     );
-  }
 
-  return (
-    <div
-      style={{
-        height: "100%",
-        width: "100%",
-        overflow: "auto",
-        background: "#f3f4f6", // 옅은 회색
-        display: "grid",
-        justifyContent: "center",
-        alignContent: "start",
-      }}
-    >
-      <div
-        style={{
-          width: canvasWidth,
-          minHeight: 600,
-          background: "#ffffff",
-          boxShadow: "0 0 0 1px #e5e7eb inset",
-        }}
-      >
-        <NodeView id={rootId} nodesMap={nodesMap} state={state} />
-      </div>
-    </div>
-  );
+    /** 단일 노드 렌더러 */
+    function NodeView({ node }: { node: NodeAny }) {
+        const def = getComponent(node.componentId) as
+            | ComponentDefinition<Record<string, unknown>, StyleBase>
+            | undefined;
+
+        if (!def) {
+            return (
+                <div
+                    style={{
+                        padding: 8,
+                        border: "1px dashed #ef4444",
+                        color: "#ef4444",
+                        margin: 4,
+                    }}
+                >
+                    Unknown component: {node.componentId}
+                </div>
+            );
+        }
+
+        // 데이터 바인딩 스코프(노드/루트 포함)
+        const rootNode = state.project.nodes[state.project.rootId] as NodeAny;
+        const scope: BindingScope = {
+            data: state.data,
+            settings: state.settings,
+            node,
+            root: rootNode,
+        };
+
+        // props에 {{ }} 템플릿 적용
+        const boundProps = getBoundProps(
+            node.props as Record<string, unknown>,
+            scope
+        );
+
+        // 실제 컴포넌트 렌더
+        const rendered = def.Render({
+            node: { ...node, props: boundProps } as NodeAny,
+            fire: undefined,
+        });
+
+        // Render가 null을 반환하는 경우 방어
+        if (!rendered) return null;
+
+        // 여기서부터는 타입 안정화를 위해 any로 명시
+        const el = rendered as React.ReactElement<any>;
+        const isSelected = state.ui.selectedId === node.id;
+
+        const handleSelect: React.MouseEventHandler = (ev) => {
+            ev.stopPropagation();
+            store.select(node.id);
+        };
+
+        // 자식 엘리먼트의 position을 파악(absolute/fixed면 래퍼가 0×0이 될 수 있음)
+        const childStyle = (el.props?.style ?? {}) as React.CSSProperties;
+        const childPos = String(childStyle.position ?? "");
+
+        if (childPos === "absolute" || childPos === "fixed") {
+            // ✅ absolute/fixed: 엘리먼트 자체에 outline과 onClick을 부여 (cloneElement)
+            return React.cloneElement(el, {
+                onClick: handleSelect,
+                style: {
+                    ...childStyle,
+                    outline: isSelected ? "2px solid #3b82f6" : childStyle.outline,
+                    outlineOffset:
+                        isSelected && childStyle.outlineOffset == null ? -1 : childStyle.outlineOffset,
+                    cursor: "default",
+                } as React.CSSProperties,
+            });
+        }
+
+        // ✅ 그 외: 래퍼 + 오버레이로 선택 윤곽선 표시
+        return (
+            <div
+                data-node-id={node.id}
+                onClick={handleSelect}
+                style={{
+                    position: "relative",
+                    // 래퍼 영향 최소화: block 컨테이너에서 기본 흐름 유지
+                    // 필요 시 display: "contents"를 고려할 수 있으나, 오버레이가 불가능해져 사용하지 않음
+                }}
+            >
+                {el}
+                {isSelected && (
+                    <div
+                        aria-hidden
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            pointerEvents: "none",
+                            outline: "2px solid #3b82f6",
+                            outlineOffset: -1,
+                            borderRadius:
+                                typeof childStyle.borderRadius === "number" ||
+                                typeof childStyle.borderRadius === "string"
+                                    ? childStyle.borderRadius
+                                    : undefined,
+                        }}
+                    />
+                )}
+            </div>
+        );
+    }
 }

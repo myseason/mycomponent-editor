@@ -1,18 +1,15 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
-import type { EditorState } from "@/figmaV3/core/types";
+import * as React from "react";
 import { getEditorStore } from "@/figmaV3/store/editStore";
-import type { EditorStore } from "@/figmaV3/store/editStore";
 
-/** 표준 훅: 항상 동일 시그니처로 제공 */
-export function useEditor(): { state: EditorState; store: EditorStore } {
-  const store = getEditorStore();
-  const state = useSyncExternalStore(
-    (fn) => store.subscribe(fn),
-    () => store.getState(),
-    () => store.getState()
-  );
-  return { state, store };
+/** SSR 안전: server snapshot 인자 추가 */
+export function useEditor() {
+    const store = getEditorStore();
+    const state = React.useSyncExternalStore(
+        (fn) => store.subscribe(fn),
+        () => store.getState(),
+        () => store.getState()
+    );
+    return { state, store };
 }

@@ -1,170 +1,139 @@
-"use client";
-
 import { nanoid } from "nanoid";
-
+import type {
+    EditorState, Node as NodeT, NodeAny, StyleBase,
+    ComponentDefinition
+} from "@/figmaV3/core/types";
 import { getComponent } from "@/figmaV3/core/registry";
-import type { EditorState, NodeAny, Project } from "@/figmaV3/core/types";
 
-/** 외부구독 콜백 타입 */
-type Listener = () => void;
-
-/** 내부 유틸 */
-function deepClone<T>(v: T): T {
-  return JSON.parse(JSON.stringify(v)) as T;
-}
-
-/** 최소 초기 프로젝트(루트 컨테이너 포함) */
-function createInitialProject(): Project {
-  const rootId = "root_" + nanoid(6);
-  const pageId = "page_" + nanoid(6);
-  const project: Project = {
-    pages: [{ id: pageId, name: "Page 1", rootId }],
-    nodes: {
-      [rootId]: {
-        id: rootId,
-        componentId: "box",
-        props: {},
-        styles: { element: { display: "flex", flexDirection: "column", width: 640, minHeight: 600, backgroundColor: "#fff" } },
-        children: [],
-      },
-    },
-    settings: { canvasWidth: 640 },
-  };
-  return project;
-}
-
-/** 표준 Store 인터페이스 (확장/교체 가능하도록 노출) */
+/**
+ * V3 EditorStore
+ * - subscribe / getState / update
+ * - select
+ * - addByDef / addByDefAt
+ * - patchNode
+ */
 export interface EditorStore {
-  /** 상태 접근/구독 */
-  getState(): EditorState;
-  subscribe(fn: Listener): () => void;
+    subscribe(fn: () => void): () => void;
+    getState(): EditorState;
+    update(mutator: (draft: EditorState) => void): void;
 
-  /** 공통 갱신 */
-  update(mutator: (s: EditorState) => void): void;
+    select(id: string | null): void;
 
-  /** 조회 */
-  getRootId(): string | null;
-  getParentOf(id: string): NodeAny | undefined;
+    addByDef(defId: string, parentId?: string): string;
+    addByDefAt(defId: string, parentId: string, index: number): string;
 
-  /** 선택 */
-  select(id: string | null): void;
-
-  /** 노드 추가/패치 */
-  addByDef(defId: string, parentId?: string): string;
-  patchNode(id: string, patch: Partial<NodeAny>): void;
-  updateNodeProps(id: string, patch: Record<string, unknown>): void;
-
-  /** 프로젝트 직렬화 */
-  exportProject(): string;
-  importProject(json: string): void;
+    patchNode<TP extends Record<string, unknown>, TS extends StyleBase>(
+        id: string,
+        patch: Partial<NodeT<TP, TS>>
+    ): void;
 }
 
-/** 구현체 */
-class EditorStoreImpl implements EditorStore {
-  private state: EditorState;
-  private listeners = new Set<Listener>();
+// ─────────────────────────────────────────────────────────────
+// 내부 상태
+// ─────────────────────────────────────────────────────────────
+const listeners = new Set<() => void>();
+const rootId = nanoid(10);
 
-  constructor() {
-    const project = createInitialProject();
-    this.state = {
-      project,
-      currentPageId: project.pages[0]?.id ?? null,
-      selectedId: project.pages[0]?.rootId ?? null,
-      ui: { selectedId: project.pages[0]?.rootId },
-    };
-  }
+const initialState: EditorState = {
+    project: {
+        rootId,
+        nodes: {
+            [rootId]: {
+                id: rootId,
+                componentId: "box",
+                props: { as: "div" },
+                styles: { element: { display: "flex", flexDirection: "column", gap: 8 } },
+                children: []
+            }
+        }
+    },
+    ui: { selectedId: rootId },
+    data: {},
+    settings: { canvasWidth: 640, enableActions: true,  dockRight: false }
+};
 
-  getState(): EditorState { return this.state; }
-  subscribe(fn: Listener): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
-  private emit(): void { this.listeners.forEach((l) => l()); }
+let state: EditorState = initialState;
 
-  update(mutator: (s: EditorState) => void): void { mutator(this.state); this.emit(); }
-
-  select(id: string | null): void {
-    this.update((s) => {
-      s.selectedId = id;
-      if (!s.ui) s.ui = {};
-      s.ui.selectedId = id ?? undefined;
-    });
-  }
-
-  getRootId(): string | null {
-    const { project, currentPageId } = this.state;
-    const page = currentPageId
-      ? project.pages.find((p) => p.id === currentPageId)
-      : project.pages[0];
-    return page?.rootId ?? null;
-  }
-
-  getParentOf(id: string): NodeAny | undefined {
-    const map = this.state.project.nodes;
-    for (const n of Object.values(map)) {
-      if (n.children?.includes(id)) return n;
+function emit() {
+    for (const fn of Array.from(listeners)) {
+        try { fn(); } catch { /* noop */ }
     }
-    return undefined;
-  }
-
-  addByDef(defId: string, parentId?: string): string {
-    const def = getComponent(defId);
-    if (!def) throw new Error(`Unknown component: ${defId}`);
-
-    const id = nanoid(10);
-    const props = deepClone(def.defaults.props ?? {});
-    const styles = deepClone(def.defaults.styles ?? {});
-    const node: NodeAny = { id, componentId: def.id, props, styles, children: [] };
-
-    this.update((s) => {
-      const pid = parentId ?? (this.getRootId() ?? "");
-      const parent = s.project.nodes[pid];
-      if (!parent) throw new Error("Parent not found");
-      s.project.nodes[id] = node;
-      parent.children.push(id);
-      s.selectedId = id;
-      if (!s.ui) s.ui = {};
-      s.ui.selectedId = id;
-    });
-    return id;
-  }
-
-  patchNode(id: string, patch: Partial<NodeAny>): void {
-    this.update((s) => {
-      const n = s.project.nodes[id];
-      if (!n) return;
-      s.project.nodes[id] = { ...n, ...patch, styles: { ...n.styles, ...(patch.styles ?? {}) } };
-    });
-  }
-
-  updateNodeProps(id: string, patch: Record<string, unknown>): void {
-    this.update((s) => {
-      const n = s.project.nodes[id];
-      if (!n) return;
-      n.props = { ...(n.props ?? {}), ...patch };
-    });
-  }
-
-  exportProject(): string {
-    return JSON.stringify({ project: this.state.project, currentPageId: this.state.currentPageId }, null, 2);
-    // TODO: 스냅샷/히스토리 전략(undo/redo)은 별도 모듈에서
-  }
-
-  importProject(json: string): void {
-    const parsed = JSON.parse(json) as { project: Project; currentPageId: string | null };
-    this.update((s) => {
-      s.project = parsed.project;
-      s.currentPageId = parsed.currentPageId;
-      s.selectedId = parsed.project.pages[0]?.rootId ?? null;
-      s.ui = { selectedId: s.selectedId ?? undefined };
-    });
-  }
 }
 
-/** 싱글톤 팩토리 */
-let _store: EditorStore | null = null;
-export function getEditorStore(): EditorStore {
-  if (!_store)
-    _store = new EditorStoreImpl();
-  return _store;
-}
+export const editorStore: EditorStore = {
+    subscribe(fn) {
+        listeners.add(fn);
+        return () => { listeners.delete(fn); };
+    },
+    getState() { return state; },
+    update(mutator) {
+        // 간단한 구조: 얕은 복제 기반의 불변 업데이트
+        const draft: EditorState = JSON.parse(JSON.stringify(state));
+        mutator(draft);
+        state = draft;
+        emit();
+    },
+    select(id) {
+        this.update(s => { s.ui.selectedId = id; });
+    },
+    addByDef(defId, parentId) {
+        const def = getComponent(defId) as ComponentDefinition<Record<string, unknown>, StyleBase> | undefined;
+        if (!def) throw new Error(`Unknown component: ${defId}`);
+
+        const id = nanoid(10);
+        const props = { ...(def.defaults.props ?? {}) } as Record<string, unknown>;
+        const styles = { ...(def.defaults.styles ?? {}) } as StyleBase;
+        const node: NodeT<Record<string, unknown>, StyleBase> = { id, componentId: def.id, props, styles, children: [] };
+
+        const pid = parentId ?? state.ui.selectedId ?? state.project.rootId;
+        if (!pid) throw new Error("Parent container not found");
+
+        this.update(s => {
+            (s.project.nodes as Record<string, NodeAny>)[id] = node as unknown as NodeAny;
+            const parent = s.project.nodes[pid] as NodeAny | undefined;
+            if (!parent) throw new Error("Parent not found");
+            (parent.children = parent.children ?? []).push(id);
+            s.ui.selectedId = id;
+        });
+
+        return id;
+    },
+    addByDefAt(defId, parentId, index) {
+        const def = getComponent(defId) as ComponentDefinition<Record<string, unknown>, StyleBase> | undefined;
+        if (!def) throw new Error(`Unknown component: ${defId}`);
+
+        const id = nanoid(10);
+        const props = { ...(def.defaults.props ?? {}) } as Record<string, unknown>;
+        const styles = { ...(def.defaults.styles ?? {}) } as StyleBase;
+        const node: NodeT<Record<string, unknown>, StyleBase> = { id, componentId: def.id, props, styles, children: [] };
+
+        this.update(s => {
+            (s.project.nodes as Record<string, NodeAny>)[id] = node as unknown as NodeAny;
+            const parent = s.project.nodes[parentId] as NodeAny | undefined;
+            if (!parent) throw new Error("Parent not found");
+            const arr = parent.children ?? (parent.children = []);
+            const i = Math.max(0, Math.min(index, arr.length));
+            arr.splice(i, 0, id);
+            s.ui.selectedId = id;
+        });
+
+        return id;
+    },
+    patchNode(id, patch) {
+        this.update(s => {
+            const map = s.project.nodes as Record<string, NodeAny>;
+            const cur = map[id];
+            if (!cur) return;
+            const next = { ...cur };
+
+            if (patch.props) next.props = { ...(cur.props ?? {}), ...(patch.props as Record<string, unknown>) };
+            if (patch.styles) next.styles = { ...(cur.styles ?? {}), ...(patch.styles as StyleBase) };
+            if (patch.children) next.children = (patch.children as string[]) ?? cur.children;
+
+            map[id] = next as NodeAny;
+        });
+    }
+};
+
+export function getEditorStore(): EditorStore { return editorStore; }
+export function getState(): EditorState { return editorStore.getState(); }
