@@ -1,0 +1,44 @@
+/* 뷰포트를 전부 쓰는 3열 그리드 레이아웃 */
+.root {
+    height: 100vh;            /* ← 핵심: 윈도우 전체 높이 */
+    display: grid;
+    grid-template-columns: 280px 1fr 360px; /* 좌/중/우 */
+    grid-template-rows: 1fr;  /* 상단바가 따로 없으면 행은 1개면 충분 */
+    gap: 0;
+    background: #f3f4f6;      /* 캔버스 바깥 영역 */
+}
+
+/* 좌 패널: Palette + Layers 탭 컨테이너 */
+.left {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;            /* overflow 동작을 위해 */
+    overflow: auto;
+    border-right: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+/* 중앙: 캔버스 컨테이너 */
+.center {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;            /* ← 핵심: flex 자식이 내용 높이를 전부 쓸 수 있게 */
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow: auto;           /* 캔버스 확대 시 스크롤 */
+    background: #f3f4f6;
+}
+
+/* 우 패널: Inspector(탭 포함) */
+.right {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    border-left: 1px solid #e5e7eb;
+    background: #ffffff;
+}

@@ -1,44 +1,32 @@
 "use client";
 
-import React, { JSX } from "react";
-
-// 컴포넌트 자동 등록(앱 1회 실행)
-import "@/figmaV3/editor/bootstrap";
-
-import Canvas from "@/figmaV3/editor/centerPanel/Canvas";
+import React from "react";
+import styles from "@/figmaV3/editor/css/editorLayout.module.css";
 import LeftPanelTabs from "@/figmaV3/editor/leftPanel/LeftPanelTabs";
 import RightPanelTabs from "@/figmaV3/editor/rightPanel/RightPanelTabs";
+import Canvas from "@/figmaV3/editor/centerPanel/Canvas";
 
-/** 에디터 레이아웃:
- *  좌: LeftPanelTabs(Palette/Layers)
- *  중: Canvas
- *  우: RightPanelTabs(Inspector/Actions/Data)
+/**
+ * 전체 에디터 레이아웃:
+ *  - 좌: Palette/Layers 탭
+ *  - 중: Canvas
+ *  - 우: Inspector 탭
+ * 그리드가 100vh를 꽉 채우며, 각 패널은 개별 스크롤을 가짐.
  */
-export default function ComponentEditor(): JSX.Element {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "280px 1fr 360px",
-        gridTemplateRows: "1fr",
-        height: "100%",
-        minHeight: 0,
-      }}
-    >
-      {/* Left */}
-      <div style={{ borderRight: "1px solid #e5e7eb", minHeight: 0 }}>
-        <LeftPanelTabs />
-      </div>
+export default function ComponentEditor() {
+    return (
+        <div className={styles.root}>
+            <div className={styles.left}>
+                <LeftPanelTabs />
+            </div>
 
-      {/* Center */}
-      <div style={{ minWidth: 0, minHeight: 0 }}>
-        <Canvas />
-      </div>
+            <div className={styles.center}>
+                <Canvas />
+            </div>
 
-      {/* Right */}
-      <div style={{ borderLeft: "1px solid #e5e7eb", minHeight: 0 }}>
-        <RightPanelTabs />
-      </div>
-    </div>
-  );
+            <div className={styles.right}>
+                <RightPanelTabs />
+            </div>
+        </div>
+    );
 }
