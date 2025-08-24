@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start --port 3003",
-    "lint": "next lint",
-    "generate-api-types": "sh -c './scripts/openapi-typescript-dev.sh \"$@\"' --"
+    "lint": "next lint"
   },
   "dependencies": {
     "@craftamap/esbuild-plugin-html": "^0.8.0",

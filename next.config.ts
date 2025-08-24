@@ -14,18 +14,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.NEXT_CMS_API_URL}/:path*`,
-      },
-      {
-        source: "/bundle/api/:path*",
-        destination: `/api/:path*`,
-      },
-    ];
-  },
 };
 
 export default nextConfig;

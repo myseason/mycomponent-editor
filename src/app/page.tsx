@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { registerBasics } from "@/figmaV3/components/registerBasics";
+import { registerBasics } from "@/figmaV3/editor/components/registerBasics";
 import ComponentEditor from "@/figmaV3/editor/ComponentEditor";
 
 export default function Page() {

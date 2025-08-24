@@ -7,7 +7,7 @@
    - 액션: fire 콜백으로 컴포넌트 내부에서 runActions 트리거
 ------------------------------------------------------------ */
 
-import React, { useCallback, useMemo } from "react";
+import React, {JSX, useCallback, useMemo} from "react";
 
 import { getComponent } from "@/figmaV3/core/registry";
 import type { EditorState, NodeAny } from "@/figmaV3/core/types";
