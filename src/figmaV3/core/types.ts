@@ -37,7 +37,6 @@ export interface Project {
 /** UI 상태 */
 export interface UIState {
     selectedId: string | null;
-    dockRight?: boolean;
 }
 
 /** 에디터 전역 상태 */
