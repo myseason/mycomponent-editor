@@ -11,56 +11,60 @@ import { getComponent } from "@/figmaV3/core/registry";
 import { useEditor } from "@/figmaV3/editor/useEditor";
 import { getBoundProps } from "@/figmaV3/runtime/binding";
 
-/** cloneElement로 덧씌울 수 있는 최소 스타일/클릭 인터페이스 */
+/** cloneElement로 덧씌울 수 있는 최소 인터페이스 */
 type StylableClickable = {
     style?: React.CSSProperties;
     onClick?: React.MouseEventHandler;
 };
 
-export default function Canvas() {
+export default function Canvas(): React.ReactElement | null {
     const { state, store } = useEditor();
     const root = state.project.nodes[state.project.rootId] as NodeAny | undefined;
-
-    if (!root) {
-        // 루트가 없다면 빈 캔버스
-        return <div style={{ flex: 1, background: "#f3f4f6" }} />;
-    }
+    if (!root) return null;
 
     return (
-        // 중앙 패널(.center)은 100vh 그리드의 1fr을 차지. 여기서는 스테이지만 그리면 됨.
         <div
-            style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "center",
-                overflow: "auto",
-            }}
+            className="center"
+            style={{ display: "flex", justifyContent: "center", height: "100%" }}
             onClick={() => store.select(state.project.rootId)}
         >
-            {/* 스테이지(흰색 보드): 보드 자체와 루트가 함께 40px 내려오도록 marginTop만 적용 */}
+            {/* 스테이지(흰 보드) + 루트 살짝 내리기(40px) */}
             <div
                 style={{
-                    width: state.settings!.canvasWidth,
-                    minHeight: "100%",
-                    background: "white",
-                    border: "1px solid #e5e7eb",
-                    boxShadow: "0 0 0 1px rgba(0,0,0,0.02) inset",
-                    marginTop: 40,               // ← ★ 보드+루트 함께 40px 하강
-                    boxSizing: "border-box",
+                    marginTop: 40,
+                    background: "#f3f4f6",
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    justifyContent: "center",
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
                     store.select(state.project.rootId);
                 }}
             >
-                <NodeView node={root} />
+                <div
+                    style={{
+                        width: state.settings?.canvasWidth ?? 640,
+                        minHeight: 400,
+                        background: "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        boxShadow: "0 0 0 1px rgba(0,0,0,0.02)",
+                        position: "relative",
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        store.select(state.project.rootId);
+                    }}
+                >
+                    <NodeView node={root} />
+                </div>
             </div>
         </div>
     );
 
     /** 단일 노드 렌더러 */
-    function NodeView({ node }: { node: NodeAny }) {
+    function NodeView({ node }: { node: NodeAny }): React.ReactElement | null {
         const def = getComponent(node.componentId) as
             | ComponentDefinition<Record<string, unknown>, StyleBase>
             | undefined;
@@ -70,9 +74,10 @@ export default function Canvas() {
                 <div
                     style={{
                         padding: 8,
+                        margin: 8,
                         border: "1px dashed #ef4444",
                         color: "#ef4444",
-                        margin: 4,
+                        fontSize: 12,
                     }}
                 >
                     Unknown component: {node.componentId}
@@ -80,19 +85,16 @@ export default function Canvas() {
             );
         }
 
-        // 데이터 바인딩 스코프
-        const rootNode = state.project.nodes[state.project.rootId] as NodeAny;
+        // 데이터 바인딩 스코프 (※ BindingScope는 rootId가 아니라 root를 받습니다)
+        const rootNode = state.project.nodes[state.project.rootId] as NodeAny | undefined ?? null;
         const scope: BindingScope = {
             data: state.data,
-            settings: state.settings,
+            settings: state.settings ?? {},
             node,
             root: rootNode,
         };
 
-        const boundProps = getBoundProps(
-            node.props as Record<string, unknown>,
-            scope
-        );
+        const boundProps = getBoundProps(node.props as Record<string, unknown>, scope);
 
         // 실제 컴포넌트 렌더
         const rendered = def.Render({
@@ -126,35 +128,22 @@ export default function Canvas() {
             });
         }
 
-        // 그 외 → 래퍼+오버레이
+        // 그 외 → 래퍼 + 오버레이
         const isRoot = node.id === state.project.rootId;
-
         return (
             <div
                 data-node-id={node.id}
-                suppressHydrationWarning
                 onClick={handleSelect}
-                style={{
-                    position: "relative",
-                    // 루트 박스가 비어있어도 보이도록 최소 높이
-                    minHeight: isRoot ? 200 : undefined,
-                }}
+                style={{ position: "relative" }}
             >
                 {el}
-                {isSelected && (
+                {isSelected && !isRoot && (
                     <div
-                        aria-hidden
                         style={{
                             position: "absolute",
                             inset: 0,
+                            border: "2px solid #3b82f6",
                             pointerEvents: "none",
-                            outline: "2px solid #3b82f6",
-                            outlineOffset: -1,
-                            borderRadius:
-                                typeof childStyle.borderRadius === "number" ||
-                                typeof childStyle.borderRadius === "string"
-                                    ? childStyle.borderRadius
-                                    : undefined,
                         }}
                     />
                 )}
