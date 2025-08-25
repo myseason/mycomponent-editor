@@ -52,7 +52,7 @@ export interface EditorState {
 }
 
 /** 액션 이벤트 종류 */
-export type SupportedEvent = "onClick" | "onChange" | "onLoad";
+export type SupportedEvent = "onClick" | "onChange" | "onLoad" | "onSubmit";
 
 /** 액션 스텝 베이스 */
 export interface ActionStepBase {
@@ -72,7 +72,7 @@ export type ActionStep =
     headers?: Record<string, string>;
     body?: unknown;
 })
-    | (ActionStepBase & { kind: "navigate"; href: string; target?: "_self" | "_blank" });
+    | (ActionStepBase & { kind: "navigate" | "openurl"; href: string; target?: "_self" | "_blank" });
 
 /** 액션 사양(이벤트별 스텝 집합) */
 export interface ActionSpec {
