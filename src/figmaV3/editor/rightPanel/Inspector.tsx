@@ -1,37 +1,37 @@
-"use client";
+import React, {JSX, useMemo} from "react";
 
-import React from "react";
-
-import { getComponent } from "@/figmaV3/core/registry";
 import { useEditor } from "@/figmaV3/editor/useEditor";
+import type { NodeAny } from "@/figmaV3/core/types";
+import RightPanelTabs from "@/figmaV3/editor/rightPanel/RightPanelTabs";
+import PropsAutoSection from "@/figmaV3/editor/rightPanel/sections/PropsAutoSection";
 
-import PropsAutoSection from "./sections/PropsAutoSection";
+export default function Inspector(): JSX.Element {
+    const { state } = useEditor();
 
-const Inspector: React.FC = () => {
-  const { state } = useEditor();
-  const id = state.selectedId ?? state.ui?.selectedId ?? null;
-  if (!id) return <div style={{ padding: 12 }}>선택된 노드가 없습니다.</div>;
+    // ✅ V3 타입: selectedId는 state.ui.selectedId
+    const selectedId = state.ui.selectedId ?? null;
+    const node: NodeAny | null = useMemo(() => {
+        if (!selectedId) return null;
+        return (state.project.nodes[selectedId] as NodeAny) ?? null;
+    }, [selectedId, state.project.nodes]);
 
-  const node = state.project.nodes[id];
-  if (!node) return <div style={{ padding: 12 }}>노드를 찾을 수 없습니다.</div>;
-  const def = getComponent(node.componentId);
-  if (!def) return <div style={{ padding: 12 }}>컴포넌트 정의를 찾을 수 없습니다.</div>;
+    if (!node) {
+        return (
+            <div style={{ padding: 12, color: "#6b7280", fontSize: 13 }}>
+                아무 컴포넌트도 선택되지 않았습니다.
+            </div>
+        );
+    }
 
-  return (
-    <div style={{ padding: 12, display: "grid", gap: 12 }}>
-      <div style={{ fontWeight: 600 }}>Inspector</div>
+    return (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+            {/* 상단 탭 (Props/Actions/Data) */}
+            <RightPanelTabs />
 
-      {/* 1) Component Props 자동 섹션(있을 때만) */}
-      {def.propsSchema && (
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Component</div>
-          <PropsAutoSection nodeId={id} />
+            {/* 기본 속성 자동 렌더링 */}
+            <div style={{ overflowY: "auto", padding: 12 }}>
+                <PropsAutoSection nodeId={node.id} />
+            </div>
         </div>
-      )}
-
-      {/* 2) 공통 스타일 섹션(Dimensions/Spacing 등) → 이후 단계에서 추가 */}
-    </div>
-  );
-};
-
-export default Inspector;
+    );
+}
