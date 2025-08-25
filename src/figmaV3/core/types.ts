@@ -1,155 +1,131 @@
-import React from "react";
+/* V3 Core Types — SSOT
+   - Node / Project / EditorState
+   - ComponentDefinition (propsSchema 포함)
+   - Actions (SupportedEvent / ActionStep / ActionSpec)
+   - BindingScope
+*/
 
-/** ──────────────────────────────────────────────────────────────────────────
- *  CSS / 스타일
- *  - CSSDict는 element 스타일에 사용하는 key-value 딕셔너리
- *  - 값은 string | number | undefined (px 등 단위는 호출부에서 일관되게)
- *  ───────────────────────────────────────────────────────────────────────── */
-export type CSSValue = string | number | undefined;
-export type CSSDict = Record<string, CSSValue>;
+import type React from "react";
 
+/** CSS 스타일 딕셔너리 */
+export type CSSDict = Record<string, string | number | undefined>;
+
+/** 모든 컴포넌트가 공유하는 스타일 베이스 */
 export interface StyleBase {
-  /** 실제 DOM 엘리먼트에 바로 바인딩되는 스타일 */
-  element?: CSSDict;
+    element?: CSSDict;
 }
 
-/** ──────────────────────────────────────────────────────────────────────────
- *  Node / Project / EditorState
- *  ───────────────────────────────────────────────────────────────────────── */
-export interface Node<P extends Record<string, unknown>, S = StyleBase> {
-  id: string;
-  componentId: string;
-  props: P;
-  styles: S;
-  children: string[];
-  flags?: { locked?: boolean };
+/** 노드(트리의 단위) */
+export interface Node<P extends Record<string, unknown> = Record<string, unknown>, S extends StyleBase = StyleBase> {
+    id: string;
+    componentId: string;
+    props: P;
+    styles: S;
+    children?: string[];
+    locked?: boolean;
 }
+
+/** 헬퍼: any 노드 */
 export type NodeAny = Node<Record<string, unknown>, StyleBase>;
 
-export interface Page {
-  id: string;
-  name: string;
-  rootId: string;
-}
-
+/** 프로젝트(페이지 단일: V3) */
 export interface Project {
-  pages: Page[];
-  nodes: Record<string, NodeAny>;
-  settings?: {
-    canvasWidth?: number; // 에디터 캔버스 너비
-  } & Record<string, unknown>;
-}
-
-/** 에디터 화면(프로젝트) 상태 */
-export interface ProjectState {
-  project: Project;
-  currentPageId: string | null;
-}
-
-// ─────────────────────────────────────────────────────────────
-// EditorState: 전역 에디터 상태 (V3 공식)
-// - project: 루트/노드 맵
-// - ui: 선택 상태 등(필요 시 확장)
-// - data: 전역 데이터 바인딩 저장소 ({{data.x}})
-// - settings: 캔버스/실행 토글 등 에디터 설정
-// ─────────────────────────────────────────────────────────────
-export interface EditorState {
-  project: {
-    /** 현재 페이지(또는 루트 컨테이너)의 루트 노드 ID */
     rootId: string;
-    /** 모든 노드 맵 (id -> node) */
     nodes: Record<string, NodeAny>;
-  };
-  ui: {
-    /** 현재 선택된 노드 ID (없으면 null) */
+}
+
+/** UI 상태 */
+export interface UIState {
     selectedId: string | null;
-    // 필요 시: hoverId, outlineVisible 등 확장 필드 추가
-  };
-  /** 전역 데이터 바인딩 저장소 */
-  data: Record<string, unknown>;
-
-  /** 에디터 설정(선택사항) */
-  settings?: {
-    /** 캔버스 폭(px). 없으면 640으로 렌더에서 기본 적용 */
-    canvasWidth?: number;
-    /** 액션 실행 허용 여부 */
-    enableActions?: boolean;
-    /** 레이아웃 도킹 등 향후 확장용 */
     dockRight?: boolean;
-  };
 }
 
-/** ──────────────────────────────────────────────────────────────────────────
- *  컴포넌트 정의(표준)
- *  ───────────────────────────────────────────────────────────────────────── */
-export type SupportedEvent = "onClick" | "onChange" | "onSubmit";
-
-/** Props 자동 렌더링을 위한 스키마(Inspector용) */
-export type PropFieldType = "text" | "textarea" | "select" | "number" | "boolean" | "url";
-
-export interface PropOption {
-  label: string;
-  value: string;
+/** 에디터 전역 상태 */
+export interface EditorState {
+    project: Project;
+    ui: UIState;
+    data: Record<string, unknown>;
+    settings: {
+        canvasWidth: number;
+        enableActions: boolean;
+        dockRight: boolean;
+    };
 }
 
-export interface PropField {
-  key: string;
-  type: PropFieldType;
-  label?: string;
-  placeholder?: string;
-  options?: PropOption[];
-  default?: unknown;
-  /** 특정 props 상태일 때만 노출하고 싶을 때 */
-  when?: Record<string, unknown>;
-}
-/* 컴포넌트 타입별 설정 가능 속성 정의 */
-export type PropsSchema = readonly PropField[];
+/** 액션 이벤트 종류 */
+export type SupportedEvent = "onClick" | "onChange" | "onLoad";
 
-/* 컴포넌트 정의 */
-export interface ComponentDefinitionBase {
-  id: string;           // registry key
-  title: string;        // Palette/Layers 노출명
-  defaults: {
-    props?: Record<string, unknown>;
-    styles?: StyleBase;
-  };
-  /** Inspector 자동 생성용(있으면 PropsAutoSection에서 사용) */
-  propsSchema?: PropsSchema;
-
-  Render(args: {
-    node: NodeAny;
-    fire?: (e: SupportedEvent) => void;
-  }): React.ReactElement | null;
+/** 액션 스텝 베이스 */
+export interface ActionStepBase {
+    /** 에러 발생 시 다음 스텝 계속 여부 */
+    continueOnError?: boolean;
+    /** 스텝 타임아웃(ms) */
+    timeoutMs?: number;
 }
 
-export interface ComponentDefinition<P extends Record<string, unknown>, S = StyleBase>
-  extends ComponentDefinitionBase {
-  Render(args: {
-    node: Node<P, S> | NodeAny;
-    fire?: (e: SupportedEvent) => void;
-  }): React.ReactElement | null;
-}
-
-/** ──────────────────────────────────────────────────────────────────────────
- *  Actions (런타임 표준)
- *  ───────────────────────────────────────────────────────────────────────── */
+/** 액션 스텝 정의 */
 export type ActionStep =
-  | { kind: "Alert";   message: string }
-  | { kind: "OpenUrl"; url: string; target?: "_blank" | "_self" }
-  | { kind: "SetData"; path: string; value: unknown };
+    | (ActionStepBase & { kind: "alert"; message: string })
+    | (ActionStepBase & {
+    kind: "http" | "https";
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    url: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+})
+    | (ActionStepBase & { kind: "navigate"; href: string; target?: "_self" | "_blank" });
 
-export interface ActionSpec { steps: ActionStep[]; }
+/** 액션 사양(이벤트별 스텝 집합) */
+export interface ActionSpec {
+    steps: ActionStep[];
+}
 
-/** ──────────────────────────────────────────────────────────────────────────
- *  Data Binding
- *  ───────────────────────────────────────────────────────────────────────── */
+/** 데이터 바인딩 스코프 */
 export interface BindingScope {
-  /** 전역/페이지/컴포넌트 데이터 */
-  data: Record<string, unknown>;
-  /** 프로젝트 설정 등 */
-  settings?: Record<string, unknown>;
-  /** 평가 대상 노드 자신 */
-  node: NodeAny;
-  /** 루트 노드 (없을 수도 있음) */
-  root: NodeAny | null;
+    data: Record<string, unknown>;
+    settings: EditorState["settings"];
+    node?: NodeAny;
+    root: NodeAny;
+}
+
+/** propsSchema 항목 정의 */
+export type PropSchemaItem =
+    | {
+    key: string;
+    type: "text" | "number";
+    label?: string;
+    placeholder?: string;
+    default?: unknown;
+}
+    | {
+    key: string;
+    type: "select";
+    label?: string;
+    options: Array<{ label: string; value: string }>;
+    default?: string;
+}
+    | {
+    key: string;
+    type: "toggle";
+    label?: string;
+    default?: boolean;
+};
+
+/** 컴포넌트 정의 */
+export interface ComponentDefinition<P extends Record<string, unknown> = Record<string, unknown>, S extends StyleBase = StyleBase> {
+    id: string;
+    title: string;
+    defaults: {
+        props: Partial<P>;
+        styles: Partial<S>;
+    };
+    /** Inspector 자동화를 위한 스키마(선택) */
+    propsSchema?: ReadonlyArray<PropSchemaItem>;
+    /** 렌더러 */
+    Render: (args: { node: Node<P, S>; fire?: (evt: SupportedEvent) => void }) => React.ReactElement | null;
+    /** Capability 힌트(선택) */
+    capabilities?: {
+        isContainer?: boolean;
+        isTextual?: boolean;
+    };
 }

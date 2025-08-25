@@ -1,118 +1,104 @@
 "use client";
 
-import React from "react";
-import { useEditor } from "@/figmaV3/editor/useEditor";
+import React, { useMemo, useCallback } from "react";
 import type { NodeAny } from "@/figmaV3/core/types";
+import { getComponent } from "@/figmaV3/core/registry";
+import { useEditor } from "@/figmaV3/editor/useEditor";
 
 export default function Layers() {
-    const { state, store } = useEditor();
+    const { state, store, selectedId } = useEditor();
+    const rootId = state.project.rootId;
+    const nodes = state.project.nodes;
 
-    // V3: pages 있을 수도/없을 수도 있음 → 항상 rootId 기준
-    const rootId = state.project?.rootId;
-    const nodes = state.project?.nodes ?? {};
-    const root = rootId ? (nodes[rootId] as NodeAny | undefined) : undefined;
+    const tree = useMemo(() => {
+        function build(id: string): { id: string; node: NodeAny; children: string[] } | null {
+            const n = nodes[id] as NodeAny | undefined;
+            if (!n) return null;
+            return { id, node: n, children: n.children ?? [] };
+        }
+        return build(rootId);
+    }, [nodes, rootId]);
 
-    if (!root) {
-        return (
-            <div style={{ padding: 12, color: "#6b7280", fontSize: 13 }}>
-                No root container.
-            </div>
-        );
-    }
+    const onSelect = useCallback((id: string) => store.select(id), [store]);
 
-    const renderItem = (id: string, depth = 0): React.ReactNode => {
+    const onToggleLock = useCallback((id: string) => {
+        if (id === rootId) return; // 루트 보호
         const n = nodes[id] as NodeAny | undefined;
-        if (!n) return null;
+        if (!n) return;
+        store.patchNode(id, { locked: !n.locked });
+    }, [store, nodes, rootId]);
 
-        const isSelected = state.ui?.selectedId === id;
+    const onDelete = useCallback((id: string) => {
+        if (id === rootId) return; // 루트 보호
+        const n = nodes[id] as NodeAny | undefined;
+        if (!n || n.locked) return;
+        // 간이 삭제(부모에서 끊고, 자기/자손 제거)는 추후 확장
+        // 여기서는 부모 탐색 없이 "노드를 orphan" 시키지 않도록 간단 경고만.
+        // 필요 시 store에 안전 삭제 API 추가 권장.
+        // eslint-disable-next-line no-alert
+        alert("삭제는 안전 삭제 API로 추후 추가 예정입니다.");
+    }, [nodes, rootId]);
 
-        const onSelect = (ev: React.MouseEvent) => {
-            ev.stopPropagation();
-            store.select(id);
-        };
-
-        const onToggleLock = (ev: React.MouseEvent) => {
-            ev.stopPropagation();
-            // patchNode 있으면 사용, 없으면 update로 flags 갱신
-            if ("patchNode" in store) {
-                (store as unknown as { patchNode: (nid: string, patch: Partial<NodeAny>) => void })
-                    .patchNode(id, { flags: { ...(n.flags ?? {}), locked: !n.flags?.locked } });
-            } else if ("update" in store) {
-                (store as unknown as { update: (fn: (s: typeof state) => void) => void }).update((draft) => {
-                    const map = draft.project.nodes as Record<string, NodeAny>;
-                    const cur = map[id];
-                    cur.flags = { ...(cur.flags ?? {}), locked: !cur.flags?.locked };
-                });
-            }
-        };
-
-        const onDelete = (ev: React.MouseEvent) => {
-            ev.stopPropagation();
-            if (n.flags?.locked) {
-                // 잠금 안내 (1~2초 사라지는 토스트는 구현 환경에 맞춰 적용)
-                // eslint-disable-next-line no-alert
-                alert("잠금 해제 후 삭제할 수 있습니다.");
-                return;
-            }
-            if ("remove" in store) {
-                (store as unknown as { remove: (nid: string) => void }).remove(id);
-            } else if ("update" in store) {
-                (store as unknown as { update: (fn: (s: typeof state) => void) => void }).update((draft) => {
-                    const map = draft.project.nodes as Record<string, NodeAny>;
-                    // 부모에서 분리
-                    const parent = Object.values(map).find((nn) => nn.children?.includes(id));
-                    if (parent) parent.children = parent.children.filter((cid) => cid !== id);
-                    // 자신 삭제
-                    delete map[id];
-                    if (draft.ui?.selectedId === id) draft.ui.selectedId = null;
-                });
-            }
-        };
-
-        return (
-            <div key={id} style={{ paddingLeft: 8 + depth * 12 }}>
-                <div
-                    onClick={onSelect}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "4px 6px",
-                        borderRadius: 6,
-                        background: isSelected ? "#e5f0ff" : "transparent",
-                        cursor: "pointer",
-                    }}
-                >
-                    {/* 아이콘/라벨 */}
-                    <span style={{ fontSize: 12, color: "#374151" }}>{n.componentId}</span>
-                    <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            {/* lock 상태 텍스트 표시 */}
-                        {n.flags?.locked ? (
-                            <span title="locked" style={{ fontSize: 11, color: "#9ca3af" }}>
-                locked
-              </span>
-                        ) : null}
-                        {/* lock 토글 */}
-                        <button type="button" onClick={onToggleLock} title="Lock/Unlock" style={{ fontSize: 11 }}>
-              {n.flags?.locked ? "Unlock" : "Lock"}
-            </button>
-                        {/* 삭제 */}
-                        <button type="button" onClick={onDelete} title="Delete" style={{ fontSize: 11 }}>
-              Del
-            </button>
-          </span>
-                </div>
-
-                {/* 자식 */}
-                {(n.children ?? []).map((cid) => renderItem(cid, depth + 1))}
-            </div>
-        );
-    };
+    if (!tree) return null;
 
     return (
-        <div style={{ padding: 8 }}>
-            <div style={{ fontSize: 12, color: "#6b7280", margin: "4px 6px 8px" }}>Layers</div>
-            {renderItem(rootId)}
+        <div style={{ padding: 8, borderTop: "1px solid #e5e7eb" }}>
+            <LayerItem
+                nodeId={tree.id}
+                depth={0}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                onToggleLock={onToggleLock}
+                onDelete={onDelete}
+                nodes={nodes}
+            />
+        </div>
+    );
+}
+
+function LayerItem(props: {
+    nodeId: string;
+    depth: number;
+    selectedId: string | null;
+    onSelect: (id: string) => void;
+    onToggleLock: (id: string) => void;
+    onDelete: (id: string) => void;
+    nodes: Record<string, NodeAny>;
+}) {
+    const { nodeId, depth, selectedId, onSelect, onToggleLock, onDelete, nodes } = props;
+    const node = nodes[nodeId] as NodeAny;
+    const def = getComponent(node.componentId);
+    const isSelected = selectedId === nodeId;
+
+    return (
+        <div style={{ paddingLeft: depth * 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onSelect(nodeId)} style={{ border: 0, background: "transparent", cursor: "pointer" }}>
+        <span style={{ fontWeight: isSelected ? 700 : 400 }}>
+          {def?.title ?? node.componentId} ({nodeId})
+        </span>
+            </button>
+            {nodeId !== (Object.values(nodes)[0]?.id ?? "") && (
+                <>
+                    <button onClick={() => onToggleLock(nodeId)} style={{ marginLeft: "auto" }}>
+                        {node.locked ? "🔒" : "🔓"}
+                    </button>
+                    <button onClick={() => onDelete(nodeId)} disabled={!!node.locked} title={node.locked ? "Lock 해제 후 삭제" : "삭제"}>
+                        🗑️
+                    </button>
+                </>
+            )}
+            {(node.children ?? []).map((cid) => (
+                <LayerItem
+                    key={cid}
+                    nodeId={cid}
+                    depth={depth + 1}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    onToggleLock={onToggleLock}
+                    onDelete={onDelete}
+                    nodes={nodes}
+                />
+            ))}
         </div>
     );
 }

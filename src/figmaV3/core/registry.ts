@@ -1,23 +1,21 @@
-import type { ComponentDefinitionBase } from "./types";
+import type { ComponentDefinition } from "./types";
 
-/**
- * 컴포넌트 레지스트리(런타임 전역)
- * - 등록/조회/목록
- */
-const REGISTRY = new Map<string, ComponentDefinitionBase>();
+const registry = new Map<string, ComponentDefinition>();
 
-export function registerComponent(def: ComponentDefinitionBase): void {
-  REGISTRY.set(def.id, def);
+export function register(def: ComponentDefinition): void {
+    registry.set(def.id, def);
 }
 
-export function getComponent(id: string): ComponentDefinitionBase | undefined {
-  return REGISTRY.get(id);
+export function getComponent(id: string): ComponentDefinition | undefined {
+    return registry.get(id);
 }
 
-export function listAllComponents(): ComponentDefinitionBase[] {
-  return Array.from(REGISTRY.values());
+export function listAll(): ComponentDefinition[] {
+    return Array.from(registry.values());
 }
 
-export function clearRegistry(): void {
-  REGISTRY.clear();
+/** 선택: 자동 등록 헬퍼 (컴포넌트 파일에서 호출) */
+export function autoRegister(defs: ComponentDefinition | ComponentDefinition[]): void {
+    const arr = Array.isArray(defs) ? defs : [defs];
+    arr.forEach(register);
 }
