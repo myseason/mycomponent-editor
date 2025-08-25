@@ -1,10 +1,9 @@
 /* V3 Core Types — SSOT
-   - Node / Project / EditorState
-   - ComponentDefinition (propsSchema 포함)
-   - Actions (SupportedEvent / ActionStep / ActionSpec)
-   - BindingScope
-*/
-
+ * - Node / Project / EditorState
+ * - ComponentDefinition (propsSchema 포함)
+ * - Actions (SupportedEvent / ActionStep / ActionSpec)
+ * - BindingScope
+ */
 import type React from "react";
 
 /** CSS 스타일 딕셔너리 */
@@ -25,10 +24,10 @@ export interface Node<P extends Record<string, unknown> = Record<string, unknown
     locked?: boolean;
 }
 
-/** 헬퍼: any 노드 */
+/** any 노드 헬퍼 */
 export type NodeAny = Node<Record<string, unknown>, StyleBase>;
 
-/** 프로젝트(페이지 단일: V3) */
+/** 프로젝트(단일 페이지) */
 export interface Project {
     rootId: string;
     nodes: Record<string, NodeAny>;
@@ -43,7 +42,9 @@ export interface UIState {
 export interface EditorState {
     project: Project;
     ui: UIState;
+    /** 전역 데이터 바인딩용 */
     data: Record<string, unknown>;
+    /** 에디터 설정 */
     settings: {
         canvasWidth: number;
         enableActions: boolean;
@@ -51,10 +52,10 @@ export interface EditorState {
     };
 }
 
-/** 액션 이벤트 종류 */
+/* ───────────────────────── Actions ───────────────────────── */
+
 export type SupportedEvent = "onClick" | "onChange" | "onLoad" | "onSubmit";
 
-/** 액션 스텝 베이스 */
 export interface ActionStepBase {
     /** 에러 발생 시 다음 스텝 계속 여부 */
     continueOnError?: boolean;
@@ -62,7 +63,6 @@ export interface ActionStepBase {
     timeoutMs?: number;
 }
 
-/** 액션 스텝 정의 */
 export type ActionStep =
     | (ActionStepBase & { kind: "alert"; message: string })
     | (ActionStepBase & {
@@ -87,41 +87,62 @@ export interface BindingScope {
     root: NodeAny;
 }
 
-/** propsSchema 항목 정의 */
-export type PropSchemaItem =
+/* ────────────────────── propsSchema(Inspector 자동화) ────────────────────── */
+
+export type PropField =
     | {
     key: string;
-    type: "text" | "number";
+    type: "text" | "textarea" | "url";
     label?: string;
     placeholder?: string;
-    default?: unknown;
+    default?: string;
+    /** 조건부 노출: props의 특정 값들과 일치해야 보임 */
+    when?: Record<string, unknown>;
+}
+    | {
+    key: string;
+    type: "number";
+    label?: string;
+    placeholder?: string;
+    default?: number;
+    when?: Record<string, unknown>;
+}
+    | {
+    key: string;
+    type: "boolean";
+    label?: string;
+    default?: boolean;
+    when?: Record<string, unknown>;
 }
     | {
     key: string;
     type: "select";
     label?: string;
-    options: Array<{ label: string; value: string }>;
+    /** ✅ ReadonlyArray 를 허용해 as const 와의 호환 보장 */
+    options: ReadonlyArray<{ label: string; value: string }>;
     default?: string;
-}
-    | {
-    key: string;
-    type: "toggle";
-    label?: string;
-    default?: boolean;
+    when?: Record<string, unknown>;
 };
 
-/** 컴포넌트 정의 */
+/* ───────────────────────── Component Definition ───────────────────────── */
+
 export interface ComponentDefinition<P extends Record<string, unknown> = Record<string, unknown>, S extends StyleBase = StyleBase> {
     id: string;
     title: string;
+
     defaults: {
+        /** 초기 props (일부만 설정 가능) */
         props: Partial<P>;
+        /** 초기 styles (일부만 설정 가능) */
         styles: Partial<S>;
     };
+
     /** Inspector 자동화를 위한 스키마(선택) */
-    propsSchema?: ReadonlyArray<PropSchemaItem>;
-    /** 렌더러 */
+    propsSchema?: ReadonlyArray<PropField>;
+
+    /** 실제 렌더러 */
     Render: (args: { node: Node<P, S>; fire?: (evt: SupportedEvent) => void }) => React.ReactElement | null;
+
     /** Capability 힌트(선택) */
     capabilities?: {
         isContainer?: boolean;
