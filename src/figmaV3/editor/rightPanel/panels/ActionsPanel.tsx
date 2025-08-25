@@ -1,5 +1,5 @@
-// src/figmaV3/editor/rightPanel/panels/ActionsPanel.tsx
 "use client";
+
 import React, { useCallback, useMemo, useState } from "react";
 import { useEditor } from "@/figmaV3/editor/useEditor";
 import {ActionStep, SupportedEvent, NodeAny, BindingScope} from "@/figmaV3/core/types";

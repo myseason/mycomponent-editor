@@ -1,4 +1,3 @@
-// src/figmaV3/core/registry.ts
 import type { ComponentDefinition, StyleBase } from "./types";
 
 /**
